@@ -357,262 +357,288 @@
   <canvas id="hiddenCanvas" class="preview-canvas" style="display:none;"></canvas>
 
   <script>
-    const API_BASE = "http://127.0.0.1:8000";
+  const API_BASE = window.location.origin;
 
-    const video = document.getElementById("video");
-    const canvas = document.getElementById("hiddenCanvas");
-    const ctx = canvas.getContext("2d");
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("hiddenCanvas");
+  const ctx = canvas.getContext("2d");
 
-    let stream = null;
-    let currentMode = "face";
+  let stream = null;
+  let currentMode = "face";
 
-    function appendLog(title, content) {
-      const logsContainer = document.getElementById("logsContainer");
-      if (logsContainer.innerHTML.includes("Logs will appear here")) {
-        logsContainer.innerHTML = "";
+  function appendLog(title, content) {
+    const logsContainer = document.getElementById("logsContainer");
+    if (logsContainer.innerHTML.includes("Logs will appear here")) {
+      logsContainer.innerHTML = "";
+    }
+
+    const item = document.createElement("div");
+    item.className = "log-item";
+    item.innerHTML = `<h4>${title}</h4><pre>${content}</pre>`;
+    logsContainer.prepend(item);
+  }
+
+  function clearLogs() {
+    document.getElementById("logsContainer").innerHTML =
+      `<p class="status-text">Logs will appear here.</p>`;
+  }
+
+  async function startCamera() {
+    try {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
       }
 
-      const item = document.createElement("div");
-      item.className = "log-item";
-      item.innerHTML = `<h4>${title}</h4><pre>${content}</pre>`;
-      logsContainer.prepend(item);
-    }
-
-    function clearLogs() {
-      document.getElementById("logsContainer").innerHTML = `<p class="status-text">Logs will appear here.</p>`;
-    }
-
-    async function startCamera() {
-      try {
-        if (stream) {
-          stream.getTracks().forEach(track => track.stop());
-        }
-
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "user",
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false
-        });
-
-        video.srcObject = stream;
-        appendLog("Camera", "Browser camera started successfully.");
-      } catch (err) {
-        appendLog("Camera Error", err.message);
-        alert("Could not access camera. Please allow camera permission.");
-      }
-    }
-
-    function switchMode(mode) {
-      currentMode = mode;
-      document.getElementById("modeText").textContent = `Mode: ${mode.toUpperCase()}`;
-
-      const guide = document.getElementById("guideBox");
-      guide.className = mode === "face" ? "face-guide" : "id-guide";
-
-      appendLog("Mode Changed", `Switched to ${mode.toUpperCase()} mode.`);
-    }
-
-    function flashCapture() {
-      const overlay = document.getElementById("overlay");
-      overlay.style.background = "rgba(255,255,255,0.45)";
-      setTimeout(() => {
-        overlay.style.background = "transparent";
-      }, 180);
-    }
-
-    function captureFrameBlob(cropType = "face") {
-      return new Promise((resolve) => {
-        const vw = video.videoWidth;
-        const vh = video.videoHeight;
-
-        canvas.width = vw;
-        canvas.height = vh;
-
-        ctx.save();
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, -vw, 0, vw, vh);
-        ctx.restore();
-
-        let sx = 0, sy = 0, sw = vw, sh = vh;
-
-        if (cropType === "face") {
-          sw = Math.floor(vw * 0.45);
-          sh = Math.floor(vh * 0.68);
-          sx = Math.floor((vw - sw) / 2);
-          sy = Math.floor((vh - sh) / 2);
-        } else if (cropType === "id") {
-          sw = Math.floor(vw * 0.28);
-          sh = Math.floor(vh * 0.62);
-          sx = Math.floor((vw - sw) / 2);
-          sy = Math.floor((vh - sh) / 2);
-        }
-
-        const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = sw;
-        tempCanvas.height = sh;
-        const tempCtx = tempCanvas.getContext("2d");
-
-        tempCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
-
-        tempCanvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.98);
-      });
-    }
-
-    async function uploadImage(endpoint, blob, filename) {
-      const formData = new FormData();
-      formData.append("file", blob, filename);
-
-      const res = await fetch(endpoint, {
-        method: "POST",
-        body: formData
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
       });
 
-      return await res.json();
+      video.srcObject = stream;
+      appendLog("Camera", "Browser camera started successfully.");
+    } catch (err) {
+      appendLog("Camera Error", err.message);
+      alert("Could not access camera. Please allow camera permission.");
     }
+  }
 
-    function setPreview(boxId, imageUrl, isId = false) {
-      const box = document.getElementById(boxId);
-      box.innerHTML = `<img src="${imageUrl}?t=${Date.now()}" alt="preview" />`;
-      if (isId) box.classList.add("id");
-    }
+  function switchMode(mode) {
+    currentMode = mode;
+    document.getElementById("modeText").textContent = `Mode: ${mode.toUpperCase()}`;
 
-    async function captureFace(angle) {
-      if (!video.srcObject) {
-        alert("Start camera first.");
-        return;
+    const guide = document.getElementById("guideBox");
+    guide.className = mode === "face" ? "face-guide" : "id-guide";
+
+    appendLog("Mode Changed", `Switched to ${mode.toUpperCase()} mode.`);
+  }
+
+  function flashCapture() {
+    const overlay = document.getElementById("overlay");
+    overlay.style.background = "rgba(255,255,255,0.45)";
+    setTimeout(() => {
+      overlay.style.background = "transparent";
+    }, 180);
+  }
+
+  function captureFrameBlob(cropType = "face") {
+    return new Promise((resolve) => {
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+
+      canvas.width = vw;
+      canvas.height = vh;
+
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, -vw, 0, vw, vh);
+      ctx.restore();
+
+      let sx = 0, sy = 0, sw = vw, sh = vh;
+
+      if (cropType === "face") {
+        sw = Math.floor(vw * 0.45);
+        sh = Math.floor(vh * 0.68);
+        sx = Math.floor((vw - sw) / 2);
+        sy = Math.floor((vh - sh) / 2);
+      } else if (cropType === "id") {
+        sw = Math.floor(vw * 0.28);
+        sh = Math.floor(vh * 0.62);
+        sx = Math.floor((vw - sw) / 2);
+        sy = Math.floor((vh - sh) / 2);
       }
 
-      document.getElementById("captureText").textContent = `Capturing ${angle.toUpperCase()}...`;
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = sw;
+      tempCanvas.height = sh;
+      const tempCtx = tempCanvas.getContext("2d");
 
-      try {
-        const blob = await captureFrameBlob("face");
-        flashCapture();
+      tempCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
 
-        const data = await uploadImage(`${API_BASE}/upload-face/${angle}`, blob, `${angle}.jpg`);
+      tempCanvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.98);
+    });
+  }
 
-        if (data.success) {
-          appendLog(`Face Captured`, `${angle.toUpperCase()} face saved successfully.`);
-          setPreview(`${angle}Box`, `${API_BASE}${data.path}`);
-        } else {
-          appendLog(`Face Capture Error`, JSON.stringify(data, null, 2));
-        }
-      } catch (err) {
-        appendLog("Face Capture Error", err.message);
-      }
+  async function uploadImage(endpoint, blob, filename) {
+    const formData = new FormData();
+    formData.append("file", blob, filename);
 
-      document.getElementById("captureText").textContent = "Ready to capture";
-    }
+    const res = await fetch(endpoint, {
+      method: "POST",
+      body: formData
+    });
 
-    async function captureID(num) {
-      if (!video.srcObject) {
-        alert("Start camera first.");
-        return;
-      }
+    return await res.json();
+  }
 
-      document.getElementById("captureText").textContent = `Capturing ID ${num}...`;
+  function setPreview(boxId, imageUrl, isId = false) {
+    const box = document.getElementById(boxId);
+    box.innerHTML = `<img src="${imageUrl}?t=${Date.now()}" alt="preview" />`;
+    if (isId) box.classList.add("id");
+  }
 
-      try {
-        const blob = await captureFrameBlob("id");
-        flashCapture();
+  async function refreshImagesStatus() {
+    try {
+      const res = await fetch(`${API_BASE}/images-status?t=${Date.now()}`);
+      const data = await res.json();
 
-        const data = await uploadImage(`${API_BASE}/upload-id/${num}`, blob, `card_${num}.jpg`);
+      // Faces
+      if (data.faces.front) setPreview("frontBox", `${API_BASE}${data.faces.front}`);
+      if (data.faces.left) setPreview("leftBox", `${API_BASE}${data.faces.left}`);
+      if (data.faces.right) setPreview("rightBox", `${API_BASE}${data.faces.right}`);
 
-        if (data.success) {
-          appendLog(`ID Captured`, `card_${num}.jpg saved successfully.`);
-          setPreview(`card${num}Box`, `${API_BASE}${data.path}`, true);
-        } else {
-          appendLog(`ID Capture Error`, JSON.stringify(data, null, 2));
-        }
-      } catch (err) {
-        appendLog("ID Capture Error", err.message);
-      }
+      // Cards
+      if (data.cards.card_1) setPreview("card1Box", `${API_BASE}${data.cards.card_1}`, true);
+      if (data.cards.card_2) setPreview("card2Box", `${API_BASE}${data.cards.card_2}`, true);
 
-      document.getElementById("captureText").textContent = "Ready to capture";
-    }
-
-    async function runExtractFace() {
-      appendLog("Extract Face", "Running automatic ID face extraction...");
-
-      try {
-        const res = await fetch(`${API_BASE}/extract-id-face`);
-        const data = await res.json();
-
-        const output = [
-          data.output ? `OUTPUT:\n${data.output}` : "",
-          data.error ? `ERROR:\n${data.error}` : ""
-        ].filter(Boolean).join("\n\n") || JSON.stringify(data, null, 2);
-
-        appendLog("Extract Face", output);
-
-        const img = `${API_BASE}/matched_faces/id_face_auto.jpg?t=${Date.now()}`;
+      // Extracted ID face
+      if (data.matched.auto) {
         document.getElementById("idFaceBox").innerHTML = `
+          <img src="${API_BASE}${data.matched.auto}?t=${Date.now()}" alt="Extracted ID Face" />
+        `;
+      } else if (data.matched.manual) {
+        document.getElementById("idFaceBox").innerHTML = `
+          <img src="${API_BASE}${data.matched.manual}?t=${Date.now()}" alt="Manual Extracted ID Face" />
+        `;
+      }
+
+      // Verification result image
+      if (data.result.verification) {
+        document.getElementById("resultImageBox").innerHTML = `
           <img 
-            src="${img}" 
-            alt="Extracted ID Face"
-            onerror="this.parentElement.innerHTML='No extracted face available yet'"
+            src="${API_BASE}${data.result.verification}?t=${Date.now()}" 
+            alt="Verification Result"
+            style="width:100%; border-radius:14px; display:block;"
           />
         `;
-      } catch (err) {
-        appendLog("Extract Face Error", err.message);
       }
+
+      return data;
+    } catch (err) {
+      appendLog("Status Refresh Error", err.message);
+      return null;
+    }
+  }
+
+  async function captureFace(angle) {
+    if (!video.srcObject) {
+      alert("Start camera first.");
+      return;
     }
 
-    async function runVerify() {
-      appendLog("Verify Match", "Running verification...");
+    document.getElementById("captureText").textContent = `Capturing ${angle.toUpperCase()}...`;
 
-      try {
-        const res = await fetch(`${API_BASE}/verify`);
-        const data = await res.json();
+    try {
+      const blob = await captureFrameBlob("face");
+      flashCapture();
 
-        const output = [
-          data.output ? `OUTPUT:\n${data.output}` : "",
-          data.error ? `ERROR:\n${data.error}` : ""
-        ].filter(Boolean).join("\n\n") || JSON.stringify(data, null, 2);
+      const data = await uploadImage(`${API_BASE}/upload-face/${angle}`, blob, `${angle}.jpg`);
 
-        appendLog("Verify Match", output);
-
-        renderVerificationSummary(output);
-
-        setTimeout(() => {
-          renderResultImage();
-        }, 500);
-
-      } catch (err) {
-        appendLog("Verify Error", err.message);
+      if (data.success) {
+        appendLog("Face Captured", `${angle.toUpperCase()} face saved successfully.`);
+        await refreshImagesStatus();
+      } else {
+        appendLog("Face Capture Error", JSON.stringify(data, null, 2));
       }
+    } catch (err) {
+      appendLog("Face Capture Error", err.message);
     }
 
-    function renderVerificationSummary(text) {
-      const matched = /MATCHED/i.test(text) && !/NOT MATCHED/i.test(text);
-      const confidenceMatch = text.match(/Confidence:\s*(\d+)%/i);
-      const distanceMatch = text.match(/Distance:\s*([0-9.]+)/i);
+    document.getElementById("captureText").textContent = "Ready to capture";
+  }
 
-      document.getElementById("resultStatusBox").innerHTML = `
-        <div style="font-size:1.5rem; font-weight:bold; color:${matched ? '#22c55e' : '#ef4444'}; margin-bottom:12px;">
-          ${matched ? 'MATCHED' : 'NOT MATCHED'}
-        </div>
-        <p class="status-text"><strong>Confidence:</strong> ${confidenceMatch ? confidenceMatch[1] + '%' : 'N/A'}</p>
-        <p class="status-text"><strong>Distance:</strong> ${distanceMatch ? distanceMatch[1] : 'N/A'}</p>
-      `;
+  async function captureID(num) {
+    if (!video.srcObject) {
+      alert("Start camera first.");
+      return;
     }
 
-    function renderResultImage() {
-      const img = `${API_BASE}/results/verification_result.jpg?t=${new Date().getTime()}`;
+    document.getElementById("captureText").textContent = `Capturing ID ${num}...`;
 
-      document.getElementById("resultImageBox").innerHTML = `
-        <img 
-          src="${img}" 
-          alt="Verification Result"
-          style="width:100%; border-radius:14px; display:block;"
-          onerror="this.parentElement.innerHTML='<p class=\\'status-text\\'>Result image could not be loaded yet. Try verify again.</p>'"
-        />
-      `;
+    try {
+      const blob = await captureFrameBlob("id");
+      flashCapture();
+
+      const data = await uploadImage(`${API_BASE}/upload-id/${num}`, blob, `card_${num}.jpg`);
+
+      if (data.success) {
+        appendLog("ID Captured", `card_${num}.jpg saved successfully.`);
+        await refreshImagesStatus();
+      } else {
+        appendLog("ID Capture Error", JSON.stringify(data, null, 2));
+      }
+    } catch (err) {
+      appendLog("ID Capture Error", err.message);
     }
 
-    switchMode("face");
-  </script>
+    document.getElementById("captureText").textContent = "Ready to capture";
+  }
+
+  async function runExtractFace() {
+    appendLog("Extract Face", "Running automatic ID face extraction...");
+
+    try {
+      const res = await fetch(`${API_BASE}/extract-id-face`);
+      const data = await res.json();
+
+      const output = [
+        data.output ? `OUTPUT:\n${data.output}` : "",
+        data.error ? `ERROR:\n${data.error}` : ""
+      ].filter(Boolean).join("\n\n") || JSON.stringify(data, null, 2);
+
+      appendLog("Extract Face", output);
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      await refreshImagesStatus();
+
+    } catch (err) {
+      appendLog("Extract Face Error", err.message);
+    }
+  }
+
+  async function runVerify() {
+    appendLog("Verify Match", "Running verification...");
+
+    try {
+      const res = await fetch(`${API_BASE}/verify`);
+      const data = await res.json();
+
+      const output = [
+        data.output ? `OUTPUT:\n${data.output}` : "",
+        data.error ? `ERROR:\n${data.error}` : ""
+      ].filter(Boolean).join("\n\n") || JSON.stringify(data, null, 2);
+
+      appendLog("Verify Match", output);
+
+      renderVerificationSummary(output);
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      await refreshImagesStatus();
+
+    } catch (err) {
+      appendLog("Verify Error", err.message);
+    }
+  }
+
+  function renderVerificationSummary(text) {
+    const matched = /MATCHED/i.test(text) && !/NOT MATCHED/i.test(text);
+    const confidenceMatch = text.match(/Confidence:\s*(\d+)%/i);
+    const distanceMatch = text.match(/Distance:\s*([0-9.]+)/i);
+
+    document.getElementById("resultStatusBox").innerHTML = `
+      <div style="font-size:1.5rem; font-weight:bold; color:${matched ? '#22c55e' : '#ef4444'}; margin-bottom:12px;">
+        ${matched ? 'MATCHED' : 'NOT MATCHED'}
+      </div>
+      <p class="status-text"><strong>Confidence:</strong> ${confidenceMatch ? confidenceMatch[1] + '%' : 'N/A'}</p>
+      <p class="status-text"><strong>Distance:</strong> ${distanceMatch ? distanceMatch[1] : 'N/A'}</p>
+    `;
+  }
+
+  switchMode("face");
+  refreshImagesStatus();
+</script>
 </body>
 </html>
