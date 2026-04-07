@@ -1,0 +1,14 @@
+.venv/
+venv/
+scan_env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+runs/
+dataset/
+captures/
+detected_cards/
+matched_faces/
+results/
