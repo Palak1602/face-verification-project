@@ -43,7 +43,9 @@ os.makedirs(CARDS_DIR, exist_ok=True)
 os.makedirs(MATCHED_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
+# =========================
 # Serve saved images
+# =========================
 app.mount("/captures", StaticFiles(directory=CAPTURES_DIR), name="captures")
 app.mount("/detected_cards", StaticFiles(directory=CARDS_DIR), name="detected_cards")
 app.mount("/matched_faces", StaticFiles(directory=MATCHED_DIR), name="matched_faces")
@@ -72,6 +74,12 @@ def run_script(script_path):
             "error": str(e),
             "script": os.path.basename(script_path)
         }
+
+def file_url(file_path, public_path):
+    """
+    Returns public URL if file exists, else None
+    """
+    return public_path if os.path.exists(file_path) else None
 
 # =========================
 # Routes
@@ -132,19 +140,43 @@ def verify():
 def images_status():
     return {
         "faces": {
-            "front": os.path.exists(os.path.join(CAPTURES_DIR, "front.jpg")),
-            "left": os.path.exists(os.path.join(CAPTURES_DIR, "left.jpg")),
-            "right": os.path.exists(os.path.join(CAPTURES_DIR, "right.jpg")),
+            "front": file_url(
+                os.path.join(CAPTURES_DIR, "front.jpg"),
+                "/captures/front.jpg"
+            ),
+            "left": file_url(
+                os.path.join(CAPTURES_DIR, "left.jpg"),
+                "/captures/left.jpg"
+            ),
+            "right": file_url(
+                os.path.join(CAPTURES_DIR, "right.jpg"),
+                "/captures/right.jpg"
+            ),
         },
         "cards": {
-            "card_1": os.path.exists(os.path.join(CARDS_DIR, "card_1.jpg")),
-            "card_2": os.path.exists(os.path.join(CARDS_DIR, "card_2.jpg")),
+            "card_1": file_url(
+                os.path.join(CARDS_DIR, "card_1.jpg"),
+                "/detected_cards/card_1.jpg"
+            ),
+            "card_2": file_url(
+                os.path.join(CARDS_DIR, "card_2.jpg"),
+                "/detected_cards/card_2.jpg"
+            ),
         },
         "matched": {
-            "auto": os.path.exists(os.path.join(MATCHED_DIR, "id_face_auto.jpg")),
-            "manual": os.path.exists(os.path.join(MATCHED_DIR, "id_face_manual.jpg")),
+            "auto": file_url(
+                os.path.join(MATCHED_DIR, "id_face_auto.jpg"),
+                "/matched_faces/id_face_auto.jpg"
+            ),
+            "manual": file_url(
+                os.path.join(MATCHED_DIR, "id_face_manual.jpg"),
+                "/matched_faces/id_face_manual.jpg"
+            ),
         },
         "result": {
-            "verification": os.path.exists(os.path.join(RESULTS_DIR, "verification_result.jpg")),
+            "verification": file_url(
+                os.path.join(RESULTS_DIR, "verification_result.jpg"),
+                "/results/verification_result.jpg"
+            ),
         }
     }
