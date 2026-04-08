@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Query
+from fastapi import FastAPI, UploadFile, File, Query, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -41,7 +41,7 @@ os.makedirs(MATCHED_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 # =========================
-# Serve folders (IMPORTANT)
+# Serve folders
 # =========================
 app.mount("/captures", StaticFiles(directory=CAPTURES_DIR), name="captures")
 app.mount("/detected_cards", StaticFiles(directory=CARDS_DIR), name="detected_cards")
@@ -109,7 +109,7 @@ def home():
 async def upload_face(
     angle: str,
     file: UploadFile = File(...),
-    session_id: str = Query(...)
+    session_id: str = Form(...)
 ):
     allowed = {"front", "left", "right"}
     angle = angle.lower()
@@ -134,7 +134,7 @@ async def upload_face(
 async def upload_id(
     num: int,
     file: UploadFile = File(...),
-    session_id: str = Query(...)
+    session_id: str = Form(...)
 ):
     if num not in [1, 2]:
         return {"success": False, "error": "Only card 1 or 2 allowed"}
