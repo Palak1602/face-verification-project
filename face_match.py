@@ -209,10 +209,5 @@ if preview.shape[1] > 1200:
     scale = 1200 / preview.shape[1]
     preview = cv2.resize(preview, None, fx=scale, fy=scale)
 
-# Optional preview (safe for local use; may fail silently on Render)
-try:
-    cv2.imshow("Automatic ID Face Detection", preview)
-    cv2.waitKey(2000)
-    cv2.destroyAllWindows()
-except:
-    pass
+# Optional preview removed for Render/server compatibility
+pass
