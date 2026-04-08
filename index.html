@@ -488,47 +488,65 @@
   }
 
   async function refreshImagesStatus() {
-    try {
-      const res = await fetch(`${API_BASE}/images-status?session_id=${sessionId}&t=${Date.now()}`);
-      const data = await res.json();
+  try {
+    const res = await fetch(`${API_BASE}/images-status?session_id=${sessionId}&t=${Date.now()}`);
+    const data = await res.json();
 
-      // Faces
-      if (data.faces.front) setPreview("frontBox", `${API_BASE}${data.faces.front}`);
-      if (data.faces.left) setPreview("leftBox", `${API_BASE}${data.faces.left}`);
-      if (data.faces.right) setPreview("rightBox", `${API_BASE}${data.faces.right}`);
-
-      // Cards
-      if (data.cards.card_1) setPreview("card1Box", `${API_BASE}${data.cards.card_1}`, true);
-      if (data.cards.card_2) setPreview("card2Box", `${API_BASE}${data.cards.card_2}`, true);
-
-      // Extracted ID face
-      if (data.matched.auto) {
-        document.getElementById("idFaceBox").innerHTML = `
-          <img src="${API_BASE}${data.matched.auto}?t=${Date.now()}" alt="Extracted ID Face" />
-        `;
-      } else if (data.matched.manual) {
-        document.getElementById("idFaceBox").innerHTML = `
-          <img src="${API_BASE}${data.matched.manual}?t=${Date.now()}" alt="Manual Extracted ID Face" />
-        `;
-      }
-
-      // Verification result image
-      if (data.result.verification) {
-        document.getElementById("resultImageBox").innerHTML = `
-          <img 
-            src="${API_BASE}${data.result.verification}?t=${Date.now()}" 
-            alt="Verification Result"
-            style="width:100%; border-radius:14px; display:block;"
-          />
-        `;
-      }
-
-      return data;
-    } catch (err) {
-      appendLog("Status Refresh Error", err.message);
-      return null;
+    // =========================
+    // Faces (FIXED PATHS)
+    // =========================
+    if (data.faces.front) {
+      setPreview("frontBox", `${API_BASE}/captures/${sessionId}/front.jpg`);
     }
+
+    if (data.faces.left) {
+      setPreview("leftBox", `${API_BASE}/captures/${sessionId}/left.jpg`);
+    }
+
+    if (data.faces.right) {
+      setPreview("rightBox", `${API_BASE}/captures/${sessionId}/right.jpg`);
+    }
+
+    // =========================
+    // ID Cards
+    // =========================
+    if (data.cards.card_1) {
+      setPreview("card1Box", `${API_BASE}/detected_cards/${sessionId}/card_1.jpg`, true);
+    }
+
+    if (data.cards.card_2) {
+      setPreview("card2Box", `${API_BASE}/detected_cards/${sessionId}/card_2.jpg`, true);
+    }
+
+    // =========================
+    // Extracted Face
+    // =========================
+    if (data.matched.auto) {
+      document.getElementById("idFaceBox").innerHTML = `
+        <img src="${API_BASE}/matched_faces/${sessionId}/id_face_auto.jpg?t=${Date.now()}" />
+      `;
+    } else if (data.matched.manual) {
+      document.getElementById("idFaceBox").innerHTML = `
+        <img src="${API_BASE}/matched_faces/${sessionId}/id_face_manual.jpg?t=${Date.now()}" />
+      `;
+    }
+
+    // =========================
+    // Verification Result
+    // =========================
+    if (data.result.verification) {
+      document.getElementById("resultImageBox").innerHTML = `
+        <img src="${API_BASE}/results/${sessionId}/verification_result.jpg?t=${Date.now()}" />
+      `;
+    }
+
+    return data;
+
+  } catch (err) {
+    appendLog("Status Refresh Error", err.message);
+    return null;
   }
+}
 
   async function captureFace(angle) {
     if (!video.srcObject) {
