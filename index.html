@@ -356,8 +356,15 @@
 
   <canvas id="hiddenCanvas" class="preview-canvas" style="display:none;"></canvas>
 
-  <script>
+ <script>
   const API_BASE = window.location.origin;
+
+  // =========================
+  // SESSION SETUP (ADDED)
+  // =========================
+  const sessionId = localStorage.getItem("session_id") || crypto.randomUUID();
+  localStorage.setItem("session_id", sessionId);
+  console.log("Session ID:", sessionId);
 
   const video = document.getElementById("video");
   const canvas = document.getElementById("hiddenCanvas");
@@ -482,7 +489,7 @@
 
   async function refreshImagesStatus() {
     try {
-      const res = await fetch(`${API_BASE}/images-status?t=${Date.now()}`);
+      const res = await fetch(`${API_BASE}/images-status?session_id=${sessionId}&t=${Date.now()}`);
       const data = await res.json();
 
       // Faces
@@ -535,7 +542,11 @@
       const blob = await captureFrameBlob("face");
       flashCapture();
 
-      const data = await uploadImage(`${API_BASE}/upload-face/${angle}`, blob, `${angle}.jpg`);
+      const data = await uploadImage(
+        `${API_BASE}/upload-face/${angle}?session_id=${sessionId}`,
+        blob,
+        `${angle}.jpg`
+      );
 
       if (data.success) {
         appendLog("Face Captured", `${angle.toUpperCase()} face saved successfully.`);
@@ -562,7 +573,11 @@
       const blob = await captureFrameBlob("id");
       flashCapture();
 
-      const data = await uploadImage(`${API_BASE}/upload-id/${num}`, blob, `card_${num}.jpg`);
+      const data = await uploadImage(
+        `${API_BASE}/upload-id/${num}?session_id=${sessionId}`,
+        blob,
+        `card_${num}.jpg`
+      );
 
       if (data.success) {
         appendLog("ID Captured", `card_${num}.jpg saved successfully.`);
@@ -581,7 +596,7 @@
     appendLog("Extract Face", "Running automatic ID face extraction...");
 
     try {
-      const res = await fetch(`${API_BASE}/extract-id-face`);
+      const res = await fetch(`${API_BASE}/extract-id-face?session_id=${sessionId}`);
       const data = await res.json();
 
       const output = [
@@ -603,7 +618,7 @@
     appendLog("Verify Match", "Running verification...");
 
     try {
-      const res = await fetch(`${API_BASE}/verify`);
+      const res = await fetch(`${API_BASE}/verify?session_id=${sessionId}`);
       const data = await res.json();
 
       const output = [
