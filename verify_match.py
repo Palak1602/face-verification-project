@@ -4,14 +4,25 @@ import os
 import numpy as np
 
 # =========================
-# Paths
+# SESSION SETUP (ADDED)
 # =========================
-LIVE_FACE = "captures/front.jpg"
-ID_FACE = "matched_faces/id_face_auto.jpg"
-RESULT_DIR = "results"
-RESULT_IMAGE = os.path.join(RESULT_DIR, "verification_result.jpg")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SESSION_ID = os.environ.get("SESSION_ID", "default")
 
+CAPTURES_DIR = os.path.join(BASE_DIR, "captures", SESSION_ID)
+MATCHED_DIR = os.path.join(BASE_DIR, "matched_faces", SESSION_ID)
+RESULT_DIR = os.path.join(BASE_DIR, "results", SESSION_ID)
+
+os.makedirs(CAPTURES_DIR, exist_ok=True)
+os.makedirs(MATCHED_DIR, exist_ok=True)
 os.makedirs(RESULT_DIR, exist_ok=True)
+
+# =========================
+# Paths (UPDATED)
+# =========================
+LIVE_FACE = os.path.join(CAPTURES_DIR, "front.jpg")
+ID_FACE = os.path.join(MATCHED_DIR, "id_face_auto.jpg")
+RESULT_IMAGE = os.path.join(RESULT_DIR, "verification_result.jpg")
 
 print("\nUsing auto extracted ID face")
 print("Live face:", LIVE_FACE)
@@ -105,7 +116,6 @@ distance = None
 matched = False
 confidence = 0
 
-# Try multiple safer verification modes
 verification_modes = [
     {"model_name": "Facenet512", "detector_backend": "opencv", "enforce_detection": False},
     {"model_name": "Facenet", "detector_backend": "opencv", "enforce_detection": False},
@@ -128,8 +138,6 @@ for mode in verification_modes:
 
         distance = float(result["distance"])
 
-        # Practical threshold for ID vs live
-        # Slightly relaxed because ID-photo matching is harder
         if mode["model_name"] == "VGG-Face":
             MATCH_THRESHOLD = 0.85
         else:
@@ -164,18 +172,15 @@ id_show = cv2.resize(id_img, (320, 320))
 # =========================
 canvas = np.ones((520, 760, 3), dtype="uint8") * 255
 
-# Place images
 canvas[80:400, 40:360] = live_show
 canvas[80:400, 400:720] = id_show
 
-# Titles
 cv2.putText(canvas, "LIVE FACE", (120, 50),
             cv2.FONT_HERSHEY_SIMPLEX, 0.9, (50, 50, 50), 2)
 
 cv2.putText(canvas, "ID FACE", (500, 50),
             cv2.FONT_HERSHEY_SIMPLEX, 0.9, (50, 50, 50), 2)
 
-# Result text
 result_text = "MATCHED" if matched else "NOT MATCHED"
 result_color = (0, 180, 0) if matched else (0, 0, 255)
 
@@ -193,9 +198,13 @@ cv2.putText(canvas, f"Confidence: {confidence}%", (430, 490),
 # =========================
 cv2.imwrite(RESULT_IMAGE, canvas)
 
-cv2.imshow("Face Verification Result", canvas)
-cv2.waitKey(2000)   # show for 2 sec only
-cv2.destroyAllWindows()
+# Safe display (Render-safe)
+try:
+    cv2.imshow("Face Verification Result", canvas)
+    cv2.waitKey(2000)
+    cv2.destroyAllWindows()
+except:
+    pass
 
 print(f"\nResult image saved at: {RESULT_IMAGE}")
 print(f"RESULT: {'MATCHED' if matched else 'NOT MATCHED'}")

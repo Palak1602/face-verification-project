@@ -3,11 +3,23 @@ import os
 import numpy as np
 
 # =========================
+# SESSION SETUP (ADDED)
+# =========================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SESSION_ID = os.environ.get("SESSION_ID", "default")
+
+CARDS_DIR = os.path.join(BASE_DIR, "detected_cards", SESSION_ID)
+MATCHED_DIR = os.path.join(BASE_DIR, "matched_faces", SESSION_ID)
+
+os.makedirs(CARDS_DIR, exist_ok=True)
+os.makedirs(MATCHED_DIR, exist_ok=True)
+
+# =========================
 # Paths
 # =========================
-card1 = "detected_cards/card_1.jpg"
-card2 = "detected_cards/card_2.jpg"
-output_folder = "matched_faces"
+card1 = os.path.join(CARDS_DIR, "card_1.jpg")
+card2 = os.path.join(CARDS_DIR, "card_2.jpg")
+output_folder = MATCHED_DIR
 os.makedirs(output_folder, exist_ok=True)
 
 # =========================
@@ -197,6 +209,10 @@ if preview.shape[1] > 1200:
     scale = 1200 / preview.shape[1]
     preview = cv2.resize(preview, None, fx=scale, fy=scale)
 
-cv2.imshow("Automatic ID Face Detection", preview)
-cv2.waitKey(2000)
-cv2.destroyAllWindows()
+# Optional preview (safe for local use; may fail silently on Render)
+try:
+    cv2.imshow("Automatic ID Face Detection", preview)
+    cv2.waitKey(2000)
+    cv2.destroyAllWindows()
+except:
+    pass

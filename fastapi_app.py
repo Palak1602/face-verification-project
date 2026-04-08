@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -24,8 +24,6 @@ app.add_middleware(
 # Paths
 # =========================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Use current Python interpreter (works locally + Docker)
 PYTHON_EXEC = sys.executable
 
 FACE_MATCH_SCRIPT = os.path.join(BASE_DIR, "face_match.py")
@@ -37,31 +35,47 @@ CARDS_DIR = os.path.join(BASE_DIR, "detected_cards")
 MATCHED_DIR = os.path.join(BASE_DIR, "matched_faces")
 RESULTS_DIR = os.path.join(BASE_DIR, "results")
 
-# Create folders if not exist
 os.makedirs(CAPTURES_DIR, exist_ok=True)
 os.makedirs(CARDS_DIR, exist_ok=True)
 os.makedirs(MATCHED_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-# =========================
-# Serve saved images
-# =========================
+# Serve folders
 app.mount("/captures", StaticFiles(directory=CAPTURES_DIR), name="captures")
 app.mount("/detected_cards", StaticFiles(directory=CARDS_DIR), name="detected_cards")
 app.mount("/matched_faces", StaticFiles(directory=MATCHED_DIR), name="matched_faces")
 app.mount("/results", StaticFiles(directory=RESULTS_DIR), name="results")
 
 # =========================
-# Helper
+# Helpers
 # =========================
-def run_script(script_path):
+def ensure_session_dirs(session_id):
+    cap = os.path.join(CAPTURES_DIR, session_id)
+    card = os.path.join(CARDS_DIR, session_id)
+    match = os.path.join(MATCHED_DIR, session_id)
+    result = os.path.join(RESULTS_DIR, session_id)
+
+    os.makedirs(cap, exist_ok=True)
+    os.makedirs(card, exist_ok=True)
+    os.makedirs(match, exist_ok=True)
+    os.makedirs(result, exist_ok=True)
+
+    return cap, card, match, result
+
+
+def run_script(script_path, session_id):
     try:
+        env = os.environ.copy()
+        env["SESSION_ID"] = session_id
+
         result = subprocess.run(
             [PYTHON_EXEC, script_path],
             cwd=BASE_DIR,
             capture_output=True,
-            text=True
+            text=True,
+            env=env
         )
+
         return {
             "success": result.returncode == 0,
             "output": result.stdout,
@@ -75,12 +89,6 @@ def run_script(script_path):
             "script": os.path.basename(script_path)
         }
 
-def file_url(file_path, public_path):
-    """
-    Returns public URL if file exists, else None
-    """
-    return public_path if os.path.exists(file_path) else None
-
 # =========================
 # Routes
 # =========================
@@ -89,15 +97,21 @@ def file_url(file_path, public_path):
 def home():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
+
 @app.post("/upload-face/{angle}")
-async def upload_face(angle: str, file: UploadFile = File(...)):
+async def upload_face(
+    angle: str,
+    session_id: str = Query(...),
+    file: UploadFile = File(...)
+):
     allowed = {"front", "left", "right"}
     angle = angle.lower()
 
     if angle not in allowed:
         return {"success": False, "error": "Invalid angle"}
 
-    save_path = os.path.join(CAPTURES_DIR, f"{angle}.jpg")
+    cap_dir, _, _, _ = ensure_session_dirs(session_id)
+    save_path = os.path.join(cap_dir, f"{angle}.jpg")
 
     with open(save_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -105,15 +119,21 @@ async def upload_face(angle: str, file: UploadFile = File(...)):
     return {
         "success": True,
         "message": f"{angle} face saved",
-        "path": f"/captures/{angle}.jpg"
+        "path": f"/captures/{session_id}/{angle}.jpg"
     }
 
+
 @app.post("/upload-id/{num}")
-async def upload_id(num: int, file: UploadFile = File(...)):
+async def upload_id(
+    num: int,
+    session_id: str = Query(...),
+    file: UploadFile = File(...)
+):
     if num not in [1, 2]:
         return {"success": False, "error": "Only card 1 or 2 allowed"}
 
-    save_path = os.path.join(CARDS_DIR, f"card_{num}.jpg")
+    _, card_dir, _, _ = ensure_session_dirs(session_id)
+    save_path = os.path.join(card_dir, f"card_{num}.jpg")
 
     with open(save_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -121,62 +141,44 @@ async def upload_id(num: int, file: UploadFile = File(...)):
     return {
         "success": True,
         "message": f"card_{num}.jpg saved",
-        "path": f"/detected_cards/card_{num}.jpg"
+        "path": f"/detected_cards/{session_id}/card_{num}.jpg"
     }
 
+
 @app.get("/extract-id-face")
-def extract_face():
-    return run_script(FACE_MATCH_SCRIPT)
+def extract_face(session_id: str = Query(...)):
+    return run_script(FACE_MATCH_SCRIPT, session_id)
+
 
 @app.get("/manual-crop")
-def manual_crop():
-    return run_script(MANUAL_CROP_SCRIPT)
+def manual_crop(session_id: str = Query(...)):
+    return run_script(MANUAL_CROP_SCRIPT, session_id)
+
 
 @app.get("/verify")
-def verify():
-    return run_script(VERIFY_SCRIPT)
+def verify(session_id: str = Query(...)):
+    return run_script(VERIFY_SCRIPT, session_id)
+
 
 @app.get("/images-status")
-def images_status():
+def images_status(session_id: str = Query(...)):
+    cap_dir, card_dir, match_dir, result_dir = ensure_session_dirs(session_id)
+
     return {
         "faces": {
-            "front": file_url(
-                os.path.join(CAPTURES_DIR, "front.jpg"),
-                "/captures/front.jpg"
-            ),
-            "left": file_url(
-                os.path.join(CAPTURES_DIR, "left.jpg"),
-                "/captures/left.jpg"
-            ),
-            "right": file_url(
-                os.path.join(CAPTURES_DIR, "right.jpg"),
-                "/captures/right.jpg"
-            ),
+            "front": os.path.exists(os.path.join(cap_dir, "front.jpg")),
+            "left": os.path.exists(os.path.join(cap_dir, "left.jpg")),
+            "right": os.path.exists(os.path.join(cap_dir, "right.jpg")),
         },
         "cards": {
-            "card_1": file_url(
-                os.path.join(CARDS_DIR, "card_1.jpg"),
-                "/detected_cards/card_1.jpg"
-            ),
-            "card_2": file_url(
-                os.path.join(CARDS_DIR, "card_2.jpg"),
-                "/detected_cards/card_2.jpg"
-            ),
+            "card_1": os.path.exists(os.path.join(card_dir, "card_1.jpg")),
+            "card_2": os.path.exists(os.path.join(card_dir, "card_2.jpg")),
         },
         "matched": {
-            "auto": file_url(
-                os.path.join(MATCHED_DIR, "id_face_auto.jpg"),
-                "/matched_faces/id_face_auto.jpg"
-            ),
-            "manual": file_url(
-                os.path.join(MATCHED_DIR, "id_face_manual.jpg"),
-                "/matched_faces/id_face_manual.jpg"
-            ),
+            "auto": os.path.exists(os.path.join(match_dir, "id_face_auto.jpg")),
+            "manual": os.path.exists(os.path.join(match_dir, "id_face_manual.jpg")),
         },
         "result": {
-            "verification": file_url(
-                os.path.join(RESULTS_DIR, "verification_result.jpg"),
-                "/results/verification_result.jpg"
-            ),
+            "verification": os.path.exists(os.path.join(result_dir, "verification_result.jpg")),
         }
     }

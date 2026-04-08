@@ -3,10 +3,22 @@ import os
 import numpy as np
 
 # =========================
+# SESSION SETUP (ADDED)
+# =========================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SESSION_ID = os.environ.get("SESSION_ID", "default")
+
+CARDS_DIR = os.path.join(BASE_DIR, "detected_cards", SESSION_ID)
+MATCHED_DIR = os.path.join(BASE_DIR, "matched_faces", SESSION_ID)
+
+os.makedirs(CARDS_DIR, exist_ok=True)
+os.makedirs(MATCHED_DIR, exist_ok=True)
+
+# =========================
 # Setup
 # =========================
-input_folder = "detected_cards"
-output_folder = "matched_faces"
+input_folder = CARDS_DIR
+output_folder = MATCHED_DIR
 os.makedirs(output_folder, exist_ok=True)
 
 # =========================
@@ -64,7 +76,12 @@ print("Press ENTER or SPACE after selecting")
 print("Press C to cancel\n")
 
 roi = cv2.selectROI("Select Face from ID Card", display_img, False, False)
-cv2.destroyAllWindows()
+
+# Safe close (Render-safe)
+try:
+    cv2.destroyAllWindows()
+except:
+    pass
 
 x, y, w, h = roi
 
@@ -118,34 +135,35 @@ print(f"\nClear ID face saved at: {output_path}")
 # =========================
 preview = crop.copy()
 
-# Resize only if too large
 if preview.shape[1] > 500:
     scale_preview = 500 / preview.shape[1]
     preview = cv2.resize(preview, None, fx=scale_preview, fy=scale_preview)
-
-cv2.imshow("Final Cropped ID Face", preview)
 
 print("\nShowing cropped preview...")
 print("Press Q / ESC / ENTER to continue")
 print("Auto-closing in 3 seconds...")
 
-start_time = cv2.getTickCount()
+# Safe display (Render-safe)
+try:
+    cv2.imshow("Final Cropped ID Face", preview)
 
-while True:
-    key = cv2.waitKey(100) & 0xFF
+    start_time = cv2.getTickCount()
 
-    # Press key to continue
-    if key == ord('q') or key == 27 or key == 13:
-        break
+    while True:
+        key = cv2.waitKey(100) & 0xFF
 
-    # Auto close after 3 sec
-    elapsed = (cv2.getTickCount() - start_time) / cv2.getTickFrequency()
-    if elapsed >= 3:
-        break
+        if key == ord('q') or key == 27 or key == 13:
+            break
 
-    # If window closed manually
-    if cv2.getWindowProperty("Final Cropped ID Face", cv2.WND_PROP_VISIBLE) < 1:
-        break
+        elapsed = (cv2.getTickCount() - start_time) / cv2.getTickFrequency()
+        if elapsed >= 3:
+            break
 
-cv2.destroyAllWindows()
-cv2.waitKey(1)
+        if cv2.getWindowProperty("Final Cropped ID Face", cv2.WND_PROP_VISIBLE) < 1:
+            break
+
+    cv2.destroyAllWindows()
+    cv2.waitKey(1)
+
+except:
+    pass
