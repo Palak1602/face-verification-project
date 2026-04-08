@@ -14,13 +14,6 @@ import uvicorn
 app = FastAPI()
 
 # =========================
-# 🚀 LOAD MODEL ONCE (BIG SPEED BOOST)
-# =========================
-print("Loading FaceNet model...")
-FACENET_MODEL = DeepFace.build_model("Facenet")
-print("FaceNet model loaded successfully.")
-
-# =========================
 # CORS
 # =========================
 app.add_middleware(
@@ -133,7 +126,7 @@ def extract_face(session_id: str = Query(...)):
 
 
 # =========================
-# 🔥 FAST + ACCURATE VERIFY
+# FAST + ACCURATE VERIFY
 # =========================
 @app.get("/verify")
 def verify(session_id: str = Query(...)):
@@ -149,11 +142,14 @@ def verify(session_id: str = Query(...)):
         live_img = cv2.imread(live_face)
         id_img = cv2.imread(id_face)
 
+        if live_img is None or id_img is None:
+            return {"success": False, "error": "Image read failed"}
+
         # =========================
-        # ⚡ OPTIMIZED PREPROCESSING
+        # OPTIMIZED PREPROCESSING
         # =========================
         def enhance_face(img):
-            img = cv2.resize(img, (192, 192))  # faster + accurate
+            img = cv2.resize(img, (192, 192), interpolation=cv2.INTER_AREA)
 
             lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
             l, a, b = cv2.split(lab)
@@ -168,23 +164,28 @@ def verify(session_id: str = Query(...)):
         id_img = enhance_face(id_img)
 
         # =========================
-        # 🚀 FAST VERIFY
+        # LOAD MODEL ONLY WHEN VERIFY IS CALLED
+        # =========================
+        model = DeepFace.build_model("Facenet")
+
+        # =========================
+        # VERIFY
         # =========================
         result = DeepFace.verify(
             img1_path=live_img,
             img2_path=id_img,
             model_name="Facenet",
-            model=FACENET_MODEL,
-            detector_backend="opencv",  # keep accuracy
+            model=model,
+            detector_backend="opencv",
             enforce_detection=False
         )
 
         distance = float(result["distance"])
         matched = distance < 0.78
-        confidence = int((1 - distance) * 100)
+        confidence = max(0, int((1 - distance) * 100))
 
         # =========================
-        # RESULT IMAGE (same as yours)
+        # RESULT IMAGE
         # =========================
         result_image = os.path.join(result_path, "verification_result.jpg")
 
@@ -199,6 +200,11 @@ def verify(session_id: str = Query(...)):
         color = (0, 180, 0) if matched else (0, 0, 255)
 
         cv2.putText(canvas, text, (220, 450), cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
+        cv2.putText(canvas, f"Distance: {distance:.3f}", (80, 490),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (50, 50, 50), 2)
+        cv2.putText(canvas, f"Confidence: {confidence}%", (430, 490),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (50, 50, 50), 2)
+
         cv2.imwrite(result_image, canvas)
 
         return {
