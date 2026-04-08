@@ -2,6 +2,10 @@ from fastapi import FastAPI, UploadFile, File, Query, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from deepface import DeepFace
+import cv2
+import numpy as np
+
 import subprocess
 import os
 import shutil
@@ -162,10 +166,115 @@ def manual_crop(session_id: str = Query(...)):
     return run_script(MANUAL_CROP_SCRIPT, session_id)
 
 
+
 @app.get("/verify")
 def verify(session_id: str = Query(...)):
-    return run_script(VERIFY_SCRIPT, session_id)
+    try:
+        capture_path, card_path, matched_path, result_path = get_session_paths(session_id)
 
+        live_face = os.path.join(capture_path, "front.jpg")
+        auto_face = os.path.join(matched_path, "id_face_auto.jpg")
+        manual_face = os.path.join(matched_path, "id_face_manual.jpg")
+
+        result_image = os.path.join(result_path, "verification_result.jpg")
+        temp_live = os.path.join(result_path, "temp_live.jpg")
+        temp_id = os.path.join(result_path, "temp_id.jpg")
+
+        # -------------------------
+        # Choose ID face
+        # -------------------------
+        if os.path.exists(auto_face):
+            id_face = auto_face
+            source = "auto extracted ID face"
+        elif os.path.exists(manual_face):
+            id_face = manual_face
+            source = "manual cropped ID face"
+        else:
+            return {"success": False, "error": "No ID face found"}
+
+        if not os.path.exists(live_face):
+            return {"success": False, "error": "Front face not found"}
+
+        live_img = cv2.imread(live_face)
+        id_img = cv2.imread(id_face)
+
+        if live_img is None or id_img is None:
+            return {"success": False, "error": "Image read failed"}
+
+        # -------------------------
+        # FAST preprocessing
+        # -------------------------
+        def enhance_face(img):
+            img = cv2.resize(img, (256, 256), interpolation=cv2.INTER_AREA)
+
+            lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+            l, a, b = cv2.split(lab)
+
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(6, 6))
+            l = clahe.apply(l)
+
+            img = cv2.merge((l, a, b))
+            img = cv2.cvtColor(img, cv2.COLOR_LAB2BGR)
+
+            return img
+
+        live_img = enhance_face(live_img)
+        id_img = enhance_face(id_img)
+
+        cv2.imwrite(temp_live, live_img)
+        cv2.imwrite(temp_id, id_img)
+
+        # -------------------------
+        # VERIFY (FAST + ACCURATE)
+        # -------------------------
+        result = DeepFace.verify(
+            img1_path=temp_live,
+            img2_path=temp_id,
+            model_name="Facenet",
+            detector_backend="opencv",
+            enforce_detection=False
+        )
+
+        distance = float(result["distance"])
+        threshold = 0.78
+        matched = distance < threshold
+        confidence = max(0, min(100, int((1 - distance) * 100)))
+
+        # -------------------------
+        # RESULT IMAGE
+        # -------------------------
+        live_show = cv2.resize(live_img, (320, 320))
+        id_show = cv2.resize(id_img, (320, 320))
+
+        canvas = np.ones((520, 760, 3), dtype="uint8") * 255
+        canvas[80:400, 40:360] = live_show
+        canvas[80:400, 400:720] = id_show
+
+        result_text = "MATCHED" if matched else "NOT MATCHED"
+        color = (0, 180, 0) if matched else (0, 0, 255)
+
+        cv2.putText(canvas, result_text, (220, 450),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
+
+        cv2.putText(canvas, f"Distance: {distance:.3f}", (80, 490),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (50, 50, 50), 2)
+
+        cv2.putText(canvas, f"Confidence: {confidence}%", (430, 490),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (50, 50, 50), 2)
+
+        cv2.imwrite(result_image, canvas)
+
+        return {
+            "success": True,
+            "output": f"""Using {source}
+Distance: {distance:.3f}
+Confidence: {confidence}%
+{result_text}
+Result image saved"""
+        }
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.get("/images-status")
 def images_status(session_id: str = Query(...)):
