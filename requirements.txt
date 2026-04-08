@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 python-multipart
+deepface
+tensorflow
 opencv-python-headless
-numpy
-pillow
-ultralytics
+mtcnn
