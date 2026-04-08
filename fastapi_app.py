@@ -40,30 +40,35 @@ os.makedirs(CARDS_DIR, exist_ok=True)
 os.makedirs(MATCHED_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-# Serve folders
+# =========================
+# Serve folders (IMPORTANT)
+# =========================
 app.mount("/captures", StaticFiles(directory=CAPTURES_DIR), name="captures")
 app.mount("/detected_cards", StaticFiles(directory=CARDS_DIR), name="detected_cards")
 app.mount("/matched_faces", StaticFiles(directory=MATCHED_DIR), name="matched_faces")
 app.mount("/results", StaticFiles(directory=RESULTS_DIR), name="results")
 
 # =========================
-# Helpers
+# Helper: session folders
 # =========================
-def ensure_session_dirs(session_id):
-    cap = os.path.join(CAPTURES_DIR, session_id)
-    card = os.path.join(CARDS_DIR, session_id)
-    match = os.path.join(MATCHED_DIR, session_id)
-    result = os.path.join(RESULTS_DIR, session_id)
+def get_session_paths(session_id: str):
+    capture_path = os.path.join(CAPTURES_DIR, session_id)
+    card_path = os.path.join(CARDS_DIR, session_id)
+    matched_path = os.path.join(MATCHED_DIR, session_id)
+    result_path = os.path.join(RESULTS_DIR, session_id)
 
-    os.makedirs(cap, exist_ok=True)
-    os.makedirs(card, exist_ok=True)
-    os.makedirs(match, exist_ok=True)
-    os.makedirs(result, exist_ok=True)
+    os.makedirs(capture_path, exist_ok=True)
+    os.makedirs(card_path, exist_ok=True)
+    os.makedirs(matched_path, exist_ok=True)
+    os.makedirs(result_path, exist_ok=True)
 
-    return cap, card, match, result
+    return capture_path, card_path, matched_path, result_path
 
 
-def run_script(script_path, session_id):
+# =========================
+# Helper: run scripts with session_id
+# =========================
+def run_script(script_path, session_id: str):
     try:
         env = os.environ.copy()
         env["SESSION_ID"] = session_id
@@ -82,12 +87,14 @@ def run_script(script_path, session_id):
             "error": result.stderr,
             "script": os.path.basename(script_path)
         }
+
     except Exception as e:
         return {
             "success": False,
             "error": str(e),
             "script": os.path.basename(script_path)
         }
+
 
 # =========================
 # Routes
@@ -101,8 +108,8 @@ def home():
 @app.post("/upload-face/{angle}")
 async def upload_face(
     angle: str,
-    session_id: str = Query(...),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    session_id: str = Query(...)
 ):
     allowed = {"front", "left", "right"}
     angle = angle.lower()
@@ -110,8 +117,8 @@ async def upload_face(
     if angle not in allowed:
         return {"success": False, "error": "Invalid angle"}
 
-    cap_dir, _, _, _ = ensure_session_dirs(session_id)
-    save_path = os.path.join(cap_dir, f"{angle}.jpg")
+    capture_path, _, _, _ = get_session_paths(session_id)
+    save_path = os.path.join(capture_path, f"{angle}.jpg")
 
     with open(save_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -126,14 +133,14 @@ async def upload_face(
 @app.post("/upload-id/{num}")
 async def upload_id(
     num: int,
-    session_id: str = Query(...),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    session_id: str = Query(...)
 ):
     if num not in [1, 2]:
         return {"success": False, "error": "Only card 1 or 2 allowed"}
 
-    _, card_dir, _, _ = ensure_session_dirs(session_id)
-    save_path = os.path.join(card_dir, f"card_{num}.jpg")
+    _, card_path, _, _ = get_session_paths(session_id)
+    save_path = os.path.join(card_path, f"card_{num}.jpg")
 
     with open(save_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -162,23 +169,23 @@ def verify(session_id: str = Query(...)):
 
 @app.get("/images-status")
 def images_status(session_id: str = Query(...)):
-    cap_dir, card_dir, match_dir, result_dir = ensure_session_dirs(session_id)
+    capture_path, card_path, matched_path, result_path = get_session_paths(session_id)
 
     return {
         "faces": {
-            "front": os.path.exists(os.path.join(cap_dir, "front.jpg")),
-            "left": os.path.exists(os.path.join(cap_dir, "left.jpg")),
-            "right": os.path.exists(os.path.join(cap_dir, "right.jpg")),
+            "front": os.path.exists(os.path.join(capture_path, "front.jpg")),
+            "left": os.path.exists(os.path.join(capture_path, "left.jpg")),
+            "right": os.path.exists(os.path.join(capture_path, "right.jpg")),
         },
         "cards": {
-            "card_1": os.path.exists(os.path.join(card_dir, "card_1.jpg")),
-            "card_2": os.path.exists(os.path.join(card_dir, "card_2.jpg")),
+            "card_1": os.path.exists(os.path.join(card_path, "card_1.jpg")),
+            "card_2": os.path.exists(os.path.join(card_path, "card_2.jpg")),
         },
         "matched": {
-            "auto": os.path.exists(os.path.join(match_dir, "id_face_auto.jpg")),
-            "manual": os.path.exists(os.path.join(match_dir, "id_face_manual.jpg")),
+            "auto": os.path.exists(os.path.join(matched_path, "id_face_auto.jpg")),
+            "manual": os.path.exists(os.path.join(matched_path, "id_face_manual.jpg")),
         },
         "result": {
-            "verification": os.path.exists(os.path.join(result_dir, "verification_result.jpg")),
+            "verification": os.path.exists(os.path.join(result_path, "verification_result.jpg")),
         }
     }
