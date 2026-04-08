@@ -260,14 +260,14 @@
     <h1>Face Verification System</h1>
     <p class="subtitle">Live browser camera + FastAPI backend</p>
     <p id="sessionDisplay" style="
-  text-align:center;
-  color:#93c5fd;
-  font-size:14px;
-  margin-bottom:20px;
-  word-break:break-word;
-">
-  Session ID: Loading...
-</p>
+      text-align:center;
+      color:#93c5fd;
+      font-size:14px;
+      margin-bottom:20px;
+      word-break:break-word;
+    ">
+      Session ID: Loading...
+    </p>
 
     <div class="top-actions">
       <button onclick="startCamera()">Start Camera</button>
@@ -481,9 +481,6 @@
       });
     }
 
-    // =========================
-    // FIXED: session_id now goes in FormData too
-    // =========================
     async function uploadImage(endpoint, blob, filename) {
       const formData = new FormData();
       formData.append("session_id", sessionId);
@@ -534,10 +531,6 @@
         if (data.matched?.auto) {
           document.getElementById("idFaceBox").innerHTML = `
             <img src="${API_BASE}/matched_faces/${sessionId}/id_face_auto.jpg?t=${Date.now()}" alt="Extracted Face" />
-          `;
-        } else if (data.matched?.manual) {
-          document.getElementById("idFaceBox").innerHTML = `
-            <img src="${API_BASE}/matched_faces/${sessionId}/id_face_manual.jpg?t=${Date.now()}" alt="Extracted Face" />
           `;
         }
 

@@ -90,9 +90,13 @@ gray = cv2.equalizeHist(gray)
 # =========================
 # Face detector
 # =========================
-face_cascade = cv2.CascadeClassifier(
-    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-)
+cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+
+if not os.path.exists(cascade_path):
+    print("Haar cascade file not found.")
+    exit(1)
+
+face_cascade = cv2.CascadeClassifier(cascade_path)
 
 faces = face_cascade.detectMultiScale(
     gray,
@@ -100,6 +104,8 @@ faces = face_cascade.detectMultiScale(
     minNeighbors=6,
     minSize=(60, 60)
 )
+
+print(f"Total faces detected: {len(faces)}")
 
 # =========================
 # Filter only good face candidates

@@ -21,30 +21,19 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 # Paths
 # =========================
 LIVE_FACE = os.path.join(CAPTURES_DIR, "front.jpg")
-
-AUTO_FACE = os.path.join(MATCHED_DIR, "id_face_auto.jpg")
-MANUAL_FACE = os.path.join(MATCHED_DIR, "id_face_manual.jpg")
+ID_FACE = os.path.join(MATCHED_DIR, "id_face_auto.jpg")
 
 RESULT_IMAGE = os.path.join(RESULT_DIR, "verification_result.jpg")
 TEMP_LIVE = os.path.join(RESULT_DIR, "temp_live.jpg")
 TEMP_ID = os.path.join(RESULT_DIR, "temp_id.jpg")
 
 # =========================
-# Choose ID face
-# =========================
-if os.path.exists(AUTO_FACE):
-    ID_FACE = AUTO_FACE
-    print("Using auto extracted ID face")
-elif os.path.exists(MANUAL_FACE):
-    ID_FACE = MANUAL_FACE
-    print("Using manual cropped ID face")
-else:
-    print("ERROR: No ID face found")
-    exit(1)
-
-# =========================
 # Validate images
 # =========================
+if not os.path.exists(ID_FACE):
+    print("ERROR: No automatically extracted ID face found")
+    exit(1)
+
 if not os.path.exists(LIVE_FACE):
     print("ERROR: Live face missing")
     exit(1)
@@ -55,6 +44,8 @@ id_img = cv2.imread(ID_FACE)
 if live_img is None or id_img is None:
     print("ERROR: Image read failed")
     exit(1)
+
+print("Using auto extracted ID face")
 
 # =========================
 # FAST + ACCURATE PREPROCESSING
